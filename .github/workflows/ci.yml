@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile-check Python
+        run: |
+          python -m py_compile training/*.py pipelines/*.py scripts/*.py monitoring/*.py
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8"
+
+      - name: Terraform format check
+        run: terraform fmt -recursive -check terraform
+
+      - name: Terraform validate
+        run: |
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate -no-color

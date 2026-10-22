@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and adjust for your account/environment.
+# Region must be the project's assigned region (us-east-2 by default).
+
+region      = "us-east-2"
+project     = "mlops"
+environment = "dev"
+
+# Free-tier friendly SageMaker sizing for learning runs.
+sagemaker_training_instance_type   = "ml.m5.large"
+sagemaker_processing_instance_type = "ml.m5.large"
+sagemaker_endpoint_instance_type   = "ml.m5.large"
+
+# Only register the model if test accuracy clears this bar.
+accuracy_threshold = 0.90
+
+tags = {
+  Project   = "mlops-aws-pipeline"
+  ManagedBy = "terraform"
+  Owner     = "shashankvarma499"
+}

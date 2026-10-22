@@ -1,0 +1,35 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform/environments/*/*.tfvars.example
+crash.log
+*.tfplan
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Model artifacts / data
+training/output/
+training/model/
+*.tar.gz
+*.joblib
+*.pkl
+*.ubj
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Env / secrets
+.env
+.env.*
+!.env.example

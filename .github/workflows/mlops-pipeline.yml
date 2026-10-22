@@ -1,0 +1,72 @@
+name: MLOps Pipeline
+
+# Full training -> register -> deploy flow, triggered manually or on push to
+# main. The deploy job uses a GitHub "production" environment with a manual
+# approval gate (reviewers must approve before the endpoint is updated).
+#
+# Auth: uses GitHub OIDC (preferred). If your AWS project's managed SCP blocks
+# IAM OIDC-provider operations, swap role-to-assume for static keys:
+#   aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+#   aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-2
+  ROLE_ARN: ${{ secrets.SM_ROLE_ARN }}
+  BUCKET: ${{ secrets.SM_BUCKET }}
+  IMAGE: mlops-dev-training
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push training image
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE }}:latest training/
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE }}:latest
+
+  run-pipeline:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install boto3 sagemaker
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Run SageMaker pipeline
+        env:
+          SM_ROLE_ARN: ${{ secrets.SM_ROLE_ARN }}
+          SM_BUCKET: ${{ secrets.SM_BUCKET }}
+        run: python pipelines/pipeline.py
+
+  deploy:
+    needs: run-pipeline
+    runs-on: ubuntu-latest
+    environment: production # manual approval gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy registered model to endpoint
+        env:
+          SM_ROLE_ARN: ${{ secrets.SM_ROLE_ARN }}
+        run: ./scripts/deploy_endpoint.sh
